@@ -1,0 +1,196 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  schemas  = ["myschema"]
+}
+
+enum UserRole {
+  ADMIN
+  STAFF
+
+  @@schema("myschema")
+}
+
+/// Shop buys inventory from a person; pay them in one or more installments via `PurchasePayment`.
+enum PurchaseStatus {
+  PENDING
+  PARTIAL
+  PAID
+  CANCELLED
+
+  @@schema("myschema")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  fullName     String?
+  role         UserRole @default(STAFF)
+
+  accessToken         String?
+  accessTokenExpires  DateTime?
+  refreshToken        String?
+  refreshTokenExpires DateTime?
+
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  recyclePin       Boolean           @default(false)
+  jobs             Job[]
+  laptops          Laptops[]
+  accessories      Accessory[]
+  sellings         Selling[]
+  purchases        Purchase[]
+  purchasePayments PurchasePayment[]
+  expenses         Expense[]
+
+  @@schema("myschema")
+}
+
+model Job {
+  id             String    @id @default(uuid())
+  service        String
+  work_details   String?
+  price          String
+  customer_name  String
+  customer_phone String
+  device_left    Boolean   @default(false)
+  left_at        DateTime?
+  done_at        DateTime?
+  has_charger    Boolean   @default(false)
+  bag_type       String?
+  is_completed   Boolean   @default(false)
+  payment_status String
+  payment_method String
+  user_id        String
+  user           User      @relation(fields: [user_id], references: [id])
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  recyclePin     Boolean   @default(false)
+
+  @@schema("myschema")
+}
+
+model Laptops {
+  id            String    @id @default(uuid())
+  name          String
+  price         String
+  discount      String
+  ram           String
+  storage       String
+  processor     String
+  /// false after a sale line is recorded; staff can mark available again in inventory.
+  is_available  Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  user_id       String
+  user          User      @relation(fields: [user_id], references: [id])
+  sellings      Selling[] @relation("SellingLaptop")
+  recyclePin    Boolean   @default(false)
+
+  @@schema("myschema")
+}
+
+/// Inventory for accessories (mice, keyboards, cables, etc.) — sold via the same `Selling` flow as laptops.
+model Accessory {
+  id         String    @id @default(uuid())
+  name       String
+  price      String
+  discount   String
+  category   String? // e.g. mouse, keyboard, cable
+  quantity   Int       @default(1)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  user_id    String
+  user       User      @relation(fields: [user_id], references: [id])
+  sellings   Selling[] @relation("SellingAccessory")
+  recyclePin Boolean   @default(false)
+
+  @@schema("myschema")
+}
+
+/// One sale line: either a laptop OR an accessory (set exactly one of `laptop_id` or `accessory_id` in your API).
+model Selling {
+  id             String     @id @default(uuid())
+  laptop_id      String?
+  laptop         Laptops?   @relation("SellingLaptop", fields: [laptop_id], references: [id])
+  accessory_id   String?
+  accessory      Accessory? @relation("SellingAccessory", fields: [accessory_id], references: [id])
+  price           String
+  discount        String
+  /// pending | fulfilled (same vocabulary as jobs).
+  payment_status  String     @default("pending")
+  /// cash | zaad | e dahab | loan
+  payment_method  String     @default("cash")
+  customer_name   String
+  customer_phone  String
+  createdAt       DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  user_id        String
+  user           User       @relation(fields: [user_id], references: [id])
+  recyclePin     Boolean    @default(false)
+
+  @@schema("myschema")
+}
+
+model Purchase {
+  id               String            @id @default(uuid())
+  seller_name      String
+  seller_phone     String
+  /// Optional link to inventory row after you create it; otherwise use `item_description`.
+  laptop_name      String?
+  accessory_name   String?
+  item_description String?
+  /// Total amount agreed to pay the seller (string matches your other money fields).
+  agreed_price     String
+  status           PurchaseStatus    @default(PENDING)
+  notes            String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  user_id          String
+  user             User              @relation(fields: [user_id], references: [id])
+  payments         PurchasePayment[]
+  recyclePin       Boolean           @default(false)
+
+  @@schema("myschema")
+}
+
+/// One payout toward a purchase (single payment or one of many partial payments).
+model PurchasePayment {
+  id             String   @id @default(uuid())
+  purchase_id    String
+  purchase       Purchase @relation(fields: [purchase_id], references: [id], onDelete: Cascade)
+  amount         String
+  payment_method String?
+  paid_at        DateTime @default(now())
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  user_id        String
+  user           User     @relation(fields: [user_id], references: [id])
+  recyclePin     Boolean  @default(false)
+
+  @@schema("myschema")
+}
+
+model Expense {
+  id          String   @id @default(uuid())
+  description String
+  amount      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user_id     String
+  user        User     @relation(fields: [user_id], references: [id])
+  recyclePin  Boolean  @default(false)
+
+  @@schema("myschema")
+}
