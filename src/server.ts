@@ -15,7 +15,7 @@ import { expenseRouter } from "./routes/expense.routes";
 const app = express();
 const port = 3000;
 
-const defaultOrigins = ["http://localhost:5173", "http://127.0.0.1:5173"];
+const defaultOrigins = ["http://localhost:5173", "http://127.0.0.1:5173" , "https://salaan-fron.vercel.app/"];
 const fromEnv = process.env["CORS_ORIGIN"]?.split(",").map((o) => o.trim()).filter(Boolean) ?? [];
 const allowedOrigins = fromEnv.length > 0 ? fromEnv : defaultOrigins;
 
