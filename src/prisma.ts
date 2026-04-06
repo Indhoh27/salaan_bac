@@ -1,12 +1,27 @@
+import "dotenv/config";
 import pg from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient, type PrismaClient as PrismaClientType } from "@prisma/client";
 
-/** Matches `@@schema("myschema")` on models in `prisma/schema.prisma`. */
-const DEFAULT_PRISMA_PG_SCHEMA = "myschema";
+/** PostgreSQL `search_path` / adapter schema when the URL has no `?schema=` query param. */
+const DEFAULT_PRISMA_PG_SCHEMA = process.env["PG_SCHEMA"]?.trim() || "myschema";
 
-const databaseUrl = process.env["DATABASE_URL"];
-if (!databaseUrl) throw new Error("DATABASE_URL is not set");
+function resolveDatabaseUrl(): string {
+  const url =
+    process.env["DATABASE_URL"] ??
+    process.env["POSTGRES_URL"] ??
+    process.env["POSTGRES_PRISMA_URL"] ??
+    process.env["PRISMA_DATABASE_URL"];
+  if (!url?.trim()) {
+    throw new Error(
+      "Database URL is not set. Define DATABASE_URL in your deployment (or POSTGRES_URL / POSTGRES_PRISMA_URL). " +
+        "For local dev, add it to a .env file in the project root.",
+    );
+  }
+  return url.trim();
+}
+
+const databaseUrl = resolveDatabaseUrl();
 
 function parsePostgresUrl(connectionString: string): URL {
   const normalized = connectionString.replace(/^postgresql:\/\//i, "http://");
