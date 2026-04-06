@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 import { Prisma } from "@prisma/client";
+import { parseMoney } from "../helpers/money";
 import { prisma } from "../prisma";
 
 function asString(v: unknown): string | undefined {
@@ -33,7 +34,7 @@ async function setSellingPaymentColumns(id: string, payment_status: string, paym
   `;
 }
 
-async function patchSellingPaymentColumns(
+export async function patchSellingPaymentColumns(
   id: string,
   payment_status: string | undefined,
   payment_method: string | undefined,
@@ -67,10 +68,37 @@ function httpError(status: number, message: string): Error & { status: number } 
   return e;
 }
 
+const sellingLoanPaymentInclude = {
+  loanPayments: {
+    where: { recyclePin: false },
+    orderBy: { paid_at: "desc" as const },
+  },
+} as const;
+
+/** Recompute `payment_status` for a loan sale from recorded loan payments vs net amount. */
+export async function syncLoanPaymentStatus(sellingId: string): Promise<void> {
+  const selling = await prisma.selling.findFirst({ where: { id: sellingId, recyclePin: false } });
+  if (!selling) return;
+  if ((selling.payment_method ?? "").toLowerCase() !== "loan") return;
+
+  const payments = await prisma.sellingLoanPayment.findMany({
+    where: { selling_id: sellingId, recyclePin: false },
+  });
+  const paid = payments.reduce((sum, p) => sum + parseMoney(p.amount), 0);
+  const net = Math.max(0, parseMoney(selling.price) - parseMoney(selling.discount));
+  const pm = selling.payment_method ?? "loan";
+  if (net <= 0 || paid + 1e-6 >= net) {
+    await patchSellingPaymentColumns(sellingId, "fulfilled", pm);
+  } else {
+    await patchSellingPaymentColumns(sellingId, "pending", pm);
+  }
+}
+
 export async function listSellings(_req: Request, res: Response) {
   const sellings = await prisma.selling.findMany({
     where: { recyclePin: false },
     orderBy: { createdAt: "desc" },
+    include: sellingLoanPaymentInclude,
   });
   res.json(sellings);
 }
@@ -80,7 +108,10 @@ export async function getSellingById(req: Request, res: Response) {
   const id = asString(Array.isArray(rawId) ? rawId[0] : rawId);
   if (!id) return res.status(400).json({ message: "Missing id" });
 
-  const selling = await prisma.selling.findFirst({ where: { id, recyclePin: false } });
+  const selling = await prisma.selling.findFirst({
+    where: { id, recyclePin: false },
+    include: sellingLoanPaymentInclude,
+  });
   if (!selling) return res.status(404).json({ message: "Selling not found" });
   res.json(selling);
 }
@@ -156,7 +187,10 @@ export async function createSelling(req: Request, res: Response) {
       return row;
     });
 
-    const row = await prisma.selling.findFirst({ where: { id: selling.id } });
+    const row = await prisma.selling.findFirst({
+      where: { id: selling.id },
+      include: sellingLoanPaymentInclude,
+    });
     res.status(201).json(row ?? selling);
   } catch (e: unknown) {
     const err = e as { status?: number; message?: string };
@@ -198,7 +232,14 @@ export async function updateSelling(req: Request, res: Response) {
     await prisma.selling.update({ where: { id }, data });
   }
   await patchSellingPaymentColumns(id, payment_status, payment_method);
-  const selling = await prisma.selling.findFirst({ where: { id, recyclePin: false } });
+  const mid = await prisma.selling.findFirst({ where: { id, recyclePin: false } });
+  if (mid && (mid.payment_method ?? "").toLowerCase() === "loan") {
+    await syncLoanPaymentStatus(id);
+  }
+  const selling = await prisma.selling.findFirst({
+    where: { id, recyclePin: false },
+    include: sellingLoanPaymentInclude,
+  });
   if (!selling) return res.status(404).json({ message: "Selling not found" });
   res.json(selling);
 }
@@ -229,6 +270,10 @@ export async function deleteSelling(req: Request, res: Response) {
         });
       }
     }
+    await tx.sellingLoanPayment.updateMany({
+      where: { selling_id: id },
+      data: { recyclePin: true },
+    });
     await tx.selling.update({ where: { id }, data: { recyclePin: true } });
   });
   res.status(204).send();

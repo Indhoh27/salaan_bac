@@ -44,9 +44,10 @@ model User {
   laptops          Laptops[]
   accessories      Accessory[]
   sellings         Selling[]
-  purchases        Purchase[]
-  purchasePayments PurchasePayment[]
-  expenses         Expense[]
+  purchases             Purchase[]
+  purchasePayments    PurchasePayment[]
+  sellingLoanPayments SellingLoanPayment[]
+  expenses              Expense[]
 }
 
 model Job {
@@ -125,6 +126,23 @@ model Selling {
   user_id        String
   user           User       @relation(fields: [user_id], references: [id])
   recyclePin     Boolean    @default(false)
+  loanPayments   SellingLoanPayment[]
+}
+
+/// Customer payment toward a sale on **loan** (tracks partial paydown; selling `payment_status` becomes fulfilled when paid >= net).
+model SellingLoanPayment {
+  id             String   @id @default(uuid())
+  selling_id     String
+  selling        Selling  @relation(fields: [selling_id], references: [id], onDelete: Cascade)
+  amount         String
+  payment_method String?
+  paid_at        DateTime @default(now())
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  user_id        String
+  user           User     @relation(fields: [user_id], references: [id])
+  recyclePin     Boolean  @default(false)
 }
 
 model Purchase {
