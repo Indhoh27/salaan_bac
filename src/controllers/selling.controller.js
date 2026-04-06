@@ -5,7 +5,7 @@ exports.getSellingById = getSellingById;
 exports.createSelling = createSelling;
 exports.updateSelling = updateSelling;
 exports.deleteSelling = deleteSelling;
-const client_1 = require("../../generated/prisma/client");
+const client_1 = require("@prisma/client");
 const prisma_1 = require("../prisma");
 function asString(v) {
     return typeof v === "string" && v.trim() ? v.trim() : undefined;

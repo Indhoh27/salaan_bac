@@ -6,7 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.prisma = void 0;
 const pg_1 = __importDefault(require("pg"));
 const adapter_pg_1 = require("@prisma/adapter-pg");
-const client_1 = require("../generated/prisma/client");
+const client_1 = require("@prisma/client");
 /** Matches `@@schema("myschema")` on models in `prisma/schema.prisma`. */
 const DEFAULT_PRISMA_PG_SCHEMA = "myschema";
 const databaseUrl = process.env["DATABASE_URL"];

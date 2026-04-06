@@ -1,6 +1,6 @@
 import pg from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaClient, type PrismaClient as PrismaClientType } from "../generated/prisma/client";
+import { PrismaClient, type PrismaClient as PrismaClientType } from "@prisma/client";
 
 /** Matches `@@schema("myschema")` on models in `prisma/schema.prisma`. */
 const DEFAULT_PRISMA_PG_SCHEMA = "myschema";

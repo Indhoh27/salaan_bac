@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { prisma } from "../prisma";
-import type { PurchaseStatus } from "../../generated/prisma/enums";
+import type { PurchaseStatus } from "@prisma/client";
 import { recalcPurchaseStatus } from "../helpers/purchaseStatusSync";
 
 function asString(v: unknown): string | undefined {

@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { Prisma } from "../../generated/prisma/client";
+import { Prisma } from "@prisma/client";
 import { prisma } from "../prisma";
 
 function asString(v: unknown): string | undefined {

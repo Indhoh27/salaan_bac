@@ -1,5 +1,5 @@
 import { prisma } from "../prisma";
-import type { PurchaseStatus } from "../../generated/prisma/enums";
+import type { PurchaseStatus } from "@prisma/client";
 import { parseMoney } from "./money";
 
 /** Updates purchase status from agreed_price vs sum of active payments. Skips CANCELLED rows. */
