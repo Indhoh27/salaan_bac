@@ -2,6 +2,9 @@ import pg from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient, type PrismaClient as PrismaClientType } from "../generated/prisma/client";
 
+/** Matches `@@schema("myschema")` on models in `prisma/schema.prisma`. */
+const DEFAULT_PRISMA_PG_SCHEMA = "myschema";
+
 const databaseUrl = process.env["DATABASE_URL"];
 if (!databaseUrl) throw new Error("DATABASE_URL is not set");
 
@@ -10,18 +13,23 @@ function parsePostgresUrl(connectionString: string): URL {
   return new URL(normalized);
 }
 
+function resolvePgSchema(connectionString: string): string {
+  try {
+    return parsePostgresUrl(connectionString).searchParams.get("schema") ?? DEFAULT_PRISMA_PG_SCHEMA;
+  } catch {
+    return DEFAULT_PRISMA_PG_SCHEMA;
+  }
+}
+
 /**
- * `?schema=myschema` in DATABASE_URL is not always applied as PostgreSQL `search_path` when using
- * `@prisma/adapter-pg`. Set `search_path` on the pool for raw SQL, and pass the same name to the
- * adapter so ORM queries target that schema (otherwise they use `public` and you get P2021).
+ * Prisma 7 expects a driver adapter (here `@prisma/adapter-pg`) at runtime instead of a URL on the client.
+ * `?schema=` in DATABASE_URL is not always applied as PostgreSQL `search_path` for `pg`; set it on the pool
+ * for `$executeRaw`, and pass the same name to `PrismaPg` so ORM queries hit `myschema` (avoids P2021).
  */
-function createPool(connectionString: string): pg.Pool {
+function createPool(connectionString: string, schema: string): pg.Pool {
+  const searchPath = `-c search_path=${schema},public`;
   try {
     const url = parsePostgresUrl(connectionString);
-    const schema = url.searchParams.get("schema");
-    if (!schema) {
-      return new pg.Pool({ connectionString });
-    }
     const host = url.hostname;
     const port = Number(url.port) || 5432;
     const user = decodeURIComponent(url.username || "");
@@ -33,22 +41,14 @@ function createPool(connectionString: string): pg.Pool {
       user,
       password,
       database,
-      options: `-c search_path=${schema},public`,
+      options: searchPath,
     });
   } catch {
-    return new pg.Pool({ connectionString });
+    return new pg.Pool({ connectionString, options: searchPath });
   }
 }
 
-function schemaFromDatabaseUrl(connectionString: string): string | undefined {
-  try {
-    return parsePostgresUrl(connectionString).searchParams.get("schema") ?? undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-const pool = createPool(databaseUrl);
-const pgSchema = schemaFromDatabaseUrl(databaseUrl);
-const adapter = new PrismaPg(pool, pgSchema ? { schema: pgSchema } : undefined);
+const pgSchema = resolvePgSchema(databaseUrl);
+const pool = createPool(databaseUrl, pgSchema);
+const adapter = new PrismaPg(pool, { schema: pgSchema });
 export const prisma: PrismaClientType = new PrismaClient({ adapter });
