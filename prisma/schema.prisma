@@ -5,19 +5,16 @@
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
-  schemas  = ["public", "myschema"]
+   url      = env("DATABASE_URL")
 }
 
 enum UserRole {
   ADMIN
   STAFF
-
-  @@schema("myschema")
 }
 
 /// Shop buys inventory from a person; pay them in one or more installments via `PurchasePayment`.
@@ -26,8 +23,6 @@ enum PurchaseStatus {
   PARTIAL
   PAID
   CANCELLED
-
-  @@schema("myschema")
 }
 
 model User {
@@ -52,8 +47,6 @@ model User {
   purchases        Purchase[]
   purchasePayments PurchasePayment[]
   expenses         Expense[]
-
-  @@schema("myschema")
 }
 
 model Job {
@@ -76,8 +69,6 @@ model Job {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   recyclePin     Boolean   @default(false)
-
-  @@schema("myschema")
 }
 
 model Laptops {
@@ -96,8 +87,6 @@ model Laptops {
   user          User      @relation(fields: [user_id], references: [id])
   sellings      Selling[] @relation("SellingLaptop")
   recyclePin    Boolean   @default(false)
-
-  @@schema("myschema")
 }
 
 /// Inventory for accessories (mice, keyboards, cables, etc.) — sold via the same `Selling` flow as laptops.
@@ -114,8 +103,6 @@ model Accessory {
   user       User      @relation(fields: [user_id], references: [id])
   sellings   Selling[] @relation("SellingAccessory")
   recyclePin Boolean   @default(false)
-
-  @@schema("myschema")
 }
 
 /// One sale line: either a laptop OR an accessory (set exactly one of `laptop_id` or `accessory_id` in your API).
@@ -138,8 +125,6 @@ model Selling {
   user_id        String
   user           User       @relation(fields: [user_id], references: [id])
   recyclePin     Boolean    @default(false)
-
-  @@schema("myschema")
 }
 
 model Purchase {
@@ -160,8 +145,6 @@ model Purchase {
   user             User              @relation(fields: [user_id], references: [id])
   payments         PurchasePayment[]
   recyclePin       Boolean           @default(false)
-
-  @@schema("myschema")
 }
 
 /// One payout toward a purchase (single payment or one of many partial payments).
@@ -178,8 +161,6 @@ model PurchasePayment {
   user_id        String
   user           User     @relation(fields: [user_id], references: [id])
   recyclePin     Boolean  @default(false)
-
-  @@schema("myschema")
 }
 
 model Expense {
@@ -191,6 +172,4 @@ model Expense {
   user_id     String
   user        User     @relation(fields: [user_id], references: [id])
   recyclePin  Boolean  @default(false)
-
-  @@schema("myschema")
 }
